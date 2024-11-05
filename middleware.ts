@@ -9,7 +9,7 @@ const isPublicRoute = createRouteMatcher([
   "/products(.*)",
   "/categories(.*)",
   "/api/public(.*)",
-  "/api/webhook/clerk",
+  "/api/webhook/clerk(.*)",
 ]);
 
 // Clerk middleware for checking if user is authenticated
