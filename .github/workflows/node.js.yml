@@ -1,0 +1,39 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Node.js CI
+
+on:
+  push:
+    branches: ["develop"]
+  pull_request:
+    branches: ["develop"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+        
+    env:
+      DATABASE_URL: ${{ DATABASE_URL }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ CLERK_SECRET_KEY }}
+      CLERK_WEBHOOK_SECRET: ${{ CLERK_WEBHOOK_SECRET }}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${{ NEXT_PUBLIC_CLERK_SIGN_IN_URL }}
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${{ NEXT_PUBLIC_CLERK_SIGN_UP_URL }}
+      SUPER_ADMIN_EMAIL: ${{ SUPER_ADMIN_EMAIL }}
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Bun
+        run: curl -fsSL https://bun.sh/install | bash
+
+      - name: Set up Bun
+        run: bun install
+        
+      - name: Build the project
+        run: bun run build --if-present
