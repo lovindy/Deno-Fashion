@@ -4,6 +4,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import type { User } from '@prisma/client';
 import type { NextRequest } from 'next/server';
+import { Gender } from '@/types/gender';
 
 // Types
 export type AuthResult = string | NextResponse;
@@ -64,17 +65,19 @@ export async function syncUserWithDatabase(userId: string, userData: any) {
       where: { id: userId },
       update: {
         email: userData.email_addresses?.[0]?.email_address || null,
-        firstName: userData.first_name || null,
-        lastName: userData.last_name || null,
+        firstName: userData.first_name || '',
+        lastName: userData.last_name || '',
         imageUrl: userData.image_url || null,
         isEmailVerified:
           userData.email_addresses?.[0]?.verification?.status === 'verified',
+        gender: (userData.gender?.toUpperCase() as Gender) || null,
+        dateOfBirth: userData.birthday ? new Date(userData.birthday) : null,
       },
       create: {
         id: userId,
         email: userData.email_addresses?.[0]?.email_address || null,
-        firstName: userData.first_name || null,
-        lastName: userData.last_name || null,
+        firstName: userData.first_name || '',
+        lastName: userData.last_name || '',
         imageUrl: userData.image_url || null,
         isEmailVerified:
           userData.email_addresses?.[0]?.verification?.status === 'verified',
@@ -83,6 +86,8 @@ export async function syncUserWithDatabase(userId: string, userData: any) {
           process.env.SUPER_ADMIN_EMAIL
             ? 'ADMIN'
             : 'CUSTOMER',
+        gender: (userData.gender?.toUpperCase() as Gender) || null,
+        dateOfBirth: userData.birthday ? new Date(userData.birthday) : null,
       },
     });
 
