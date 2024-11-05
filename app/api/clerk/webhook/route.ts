@@ -1,10 +1,9 @@
-// app/api/webhook/clerk/route.ts
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { Webhook } from 'svix';
 import { syncUserWithDatabase } from '@/lib/auth-utils';
 
-async function validateWebhookRequest(req: Request) {
+async function validateWebhookRequest() {
   const headersList = await headers();
   const svix_id = headersList.get('svix-id');
   const svix_timestamp = headersList.get('svix-timestamp');
@@ -25,7 +24,7 @@ export async function POST(req: Request) {
   try {
     // Validate headers
     const { svix_id, svix_timestamp, svix_signature } =
-      await validateWebhookRequest(req);
+      await validateWebhookRequest();
 
     // Get the body
     const payload = await req.json();
