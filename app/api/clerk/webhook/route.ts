@@ -1,23 +1,77 @@
-import db from "@/server/db";
+// app/api/webhook/clerk/route.ts
+import { WebhookEvent } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
+import { Webhook } from 'svix';
+import { syncUserWithDatabase } from '@/lib/auth-utils';
 
-export const POST = async (req: Request) => {
-  const { data } = await req.json();
-  console.log("Clerk webhook received:", data);
+async function validateWebhookRequest(req: Request) {
+  const headersList = await headers();
+  const svix_id = headersList.get('svix-id');
+  const svix_timestamp = headersList.get('svix-timestamp');
+  const svix_signature = headersList.get('svix-signature');
 
-  const id = data.id;
-  const firstName = data.first_name;
-  const lastName = data.last_name;
-  const emailAddress = data.email_addresses[0]?.email_address;
+  if (!svix_id || !svix_timestamp || !svix_signature) {
+    throw new Error('Missing svix headers');
+  }
 
-  await db.user.create({
-    data: {
-      id,
-      firstName,
-      lastName,
-      email: emailAddress,
-    },
-  });
+  return {
+    svix_id,
+    svix_timestamp,
+    svix_signature,
+  };
+}
 
-  console.log("User has been created successfully!");
-  return new Response("Webhook Received:", { status: 200 });
-};
+export async function POST(req: Request) {
+  try {
+    // Validate headers
+    const { svix_id, svix_timestamp, svix_signature } =
+      await validateWebhookRequest(req);
+
+    // Get the body
+    const payload = await req.json();
+    const body = JSON.stringify(payload);
+
+    // Verify webhook
+    const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || '');
+    let evt: WebhookEvent;
+
+    try {
+      evt = wh.verify(body, {
+        'svix-id': svix_id,
+        'svix-timestamp': svix_timestamp,
+        'svix-signature': svix_signature,
+      }) as WebhookEvent;
+    } catch (err) {
+      console.error('Error verifying webhook:', err);
+      return new Response('Error verifying webhook', { status: 400 });
+    }
+
+    // Process the webhook
+    const eventType = evt.type;
+    const { id, ...attributes } = evt.data;
+
+    switch (eventType) {
+      case 'user.created':
+      case 'user.updated':
+        await syncUserWithDatabase(id as string, attributes);
+        break;
+
+      case 'user.deleted':
+        // Handle user deletion if needed
+        break;
+
+      default:
+        console.log(`Unhandled webhook event type: ${eventType}`);
+    }
+
+    return new Response('Webhook processed successfully', { status: 200 });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return new Response(
+      `Webhook error: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`,
+      { status: 500 }
+    );
+  }
+}

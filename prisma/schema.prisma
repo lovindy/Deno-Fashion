@@ -395,9 +395,7 @@ model CollectionProduct {
 // Enums
 enum UserRole {
   ADMIN
-  MANAGER
   CUSTOMER
-  SUPPORT
 }
 
 enum Gender {
