@@ -57,30 +57,39 @@ export async function requireSuperAdmin(
 
 // Sync Clerk user with our database
 export async function syncUserWithDatabase(userId: string, userData: any) {
-  const user = await prisma.user.upsert({
-    where: { id: userId },
-    update: {
-      email: userData.email_addresses?.[0]?.email_address,
-      firstName: userData.first_name,
-      lastName: userData.last_name,
-      imageUrl: userData.image_url,
-      isEmailVerified:
-        userData.email_addresses?.[0]?.verification?.status === 'verified',
-    },
-    create: {
-      id: userId,
-      email: userData.email_addresses?.[0]?.email_address,
-      firstName: userData.first_name,
-      lastName: userData.last_name,
-      imageUrl: userData.image_url,
-      isEmailVerified:
-        userData.email_addresses?.[0]?.verification?.status === 'verified',
-      role:
-        userData.email_addresses?.[0]?.email_address === SUPER_ADMIN_EMAIL
-          ? 'ADMIN'
-          : 'CUSTOMER',
-    },
-  });
+  console.log('Syncing user data:', userData);
 
-  return user;
+  try {
+    const user = await prisma.user.upsert({
+      where: { id: userId },
+      update: {
+        email: userData.email_addresses?.[0]?.email_address || null,
+        firstName: userData.first_name || null,
+        lastName: userData.last_name || null,
+        imageUrl: userData.image_url || null,
+        isEmailVerified:
+          userData.email_addresses?.[0]?.verification?.status === 'verified',
+      },
+      create: {
+        id: userId,
+        email: userData.email_addresses?.[0]?.email_address || null,
+        firstName: userData.first_name || null,
+        lastName: userData.last_name || null,
+        imageUrl: userData.image_url || null,
+        isEmailVerified:
+          userData.email_addresses?.[0]?.verification?.status === 'verified',
+        role:
+          userData.email_addresses?.[0]?.email_address ===
+          process.env.SUPER_ADMIN_EMAIL
+            ? 'ADMIN'
+            : 'CUSTOMER',
+      },
+    });
+
+    console.log('User synced successfully:', user);
+    return user;
+  } catch (error) {
+    console.error('Error syncing user with database:', error);
+    throw error;
+  }
 }
