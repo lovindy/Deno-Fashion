@@ -20,12 +20,11 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(cartItem);
-  } catch (err) {
-    // Use the error parameter in the response or remove it if not needed
+  } catch (error) {
     return NextResponse.json(
       {
         error: 'Failed to add to cart',
-        details: err instanceof Error ? err.message : 'Unknown error',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
