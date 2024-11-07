@@ -77,32 +77,90 @@ jobs:
         env:
           CI: true
 
-  deploy-production:
-    name: Deploy to Production
-    if: github.ref == 'refs/heads/develop'
+  prepare-deployment:
+    name: Prepare Deployment
     needs: test
     runs-on: ubuntu-latest
-    environment: production
+    outputs:
+      deployment_environment: ${{ steps.set-env.outputs.environment }}
+      is_production: ${{ steps.set-env.outputs.is_production }}
+    steps:
+      - id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=production" >> $GITHUB_OUTPUT
+            echo "is_production=true" >> $GITHUB_OUTPUT
+          else
+            echo "environment=preview" >> $GITHUB_OUTPUT
+            echo "is_production=false" >> $GITHUB_OUTPUT
+          fi
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: prepare-deployment
+    if: needs.prepare-deployment.outputs.is_production == 'false'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Install Dependencies
+      - name: Setup Environment
         run: |
-          bun install
           npm install -g vercel@latest
+          bun install
+
+      - name: Deploy to Vercel (Staging)
+        id: deploy
+        run: |
+          DEPLOYMENT_URL=$(vercel pull --yes --environment=preview --token=${{ env.VERCEL_TOKEN }} 2>&1 | grep -o 'https://.*\.vercel\.app')
+          vercel build --token=${{ env.VERCEL_TOKEN }}
+          FINAL_URL=$(vercel deploy --prebuilt --token=${{ env.VERCEL_TOKEN }})
+          echo "url=${FINAL_URL}" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [prepare-deployment, deploy-staging]
+    if: |
+      always() &&
+      needs.prepare-deployment.outputs.is_production == 'true' ||
+      (github.ref == 'refs/heads/develop' && needs.deploy-staging.result == 'success')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Environment
+        run: |
+          npm install -g vercel@latest
+          bun install
 
       - name: Deploy to Vercel (Production)
+        id: deploy
         run: |
           vercel pull --yes --environment=production --token=${{ env.VERCEL_TOKEN }}
           vercel build --prod --token=${{ env.VERCEL_TOKEN }}
-          vercel deploy --prebuilt --prod --token=${{ env.VERCEL_TOKEN }}
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ env.VERCEL_TOKEN }})
+          echo "url=${DEPLOYMENT_URL}" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_TOKEN: ${{ env.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+
+      - name: Verify Deployment
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30  # Wait for 30 seconds
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" ${{ steps.deploy.outputs.url }})
+          if [ $HTTP_STATUS -ne 200 ]; then
+            echo "Deployment verification failed! Status code: $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Deployment verified successfully!"
