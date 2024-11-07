@@ -2,6 +2,7 @@ import { WebhookEvent } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { Webhook } from 'svix';
 import { syncUserWithDatabase } from '@/lib/auth-utils';
+import { ClerkUserData } from '@/types/user';
 
 async function validateWebhookRequest() {
   const headersList = await headers();
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
     switch (eventType) {
       case 'user.created':
       case 'user.updated':
-        await syncUserWithDatabase(id as string, attributes);
+        await syncUserWithDatabase(id as string, attributes as ClerkUserData);
         break;
 
       case 'user.deleted':
