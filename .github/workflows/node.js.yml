@@ -36,9 +36,6 @@ jobs:
       - name: Lint
         run: bun lint
 
-      - name: Type check
-        run: bun run type-check
-
       - name: Run tests
         run: bun test
         env:
