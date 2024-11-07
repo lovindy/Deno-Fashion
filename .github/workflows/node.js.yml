@@ -2,11 +2,12 @@ name: Next.js CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 env:
+  # Application Environment Variables
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
   CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -15,36 +16,34 @@ env:
   NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${{ secrets.NEXT_PUBLIC_CLERK_SIGN_UP_URL }}
   SUPER_ADMIN_EMAIL: ${{ secrets.SUPER_ADMIN_EMAIL }}
 
+  # Vercel Environment Variables
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # Build Configuration
+  NODE_VERSION: '20'
+  BUN_VERSION: 'latest'
+  NEXT_TELEMETRY_DISABLED: 1
+
 jobs:
-  build-and-test:
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
-          bun-version: 'latest'
-          
+          bun-version: ${{ env.BUN_VERSION }}
+
       - name: Install dependencies
         run: bun install
-        
-      - name: Lint
-        run: bun run lint
-        
-      - name: Type check
-        run: bun run type-check
-        
-      - name: Run tests
-        run: bun test
-        env:
-          CI: true
-          
+
       - name: Build
         run: bun run build
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
-          
+
       - name: Cache build output
         uses: actions/cache@v4
         with:
@@ -53,90 +52,57 @@ jobs:
             ${{ github.workspace }}/.next/static
           key: ${{ runner.os }}-nextjs-${{ hashFiles('**/bun.lockb') }}-${{ github.sha }}
 
-  deploy-staging:
-    needs: build-and-test
-    if: github.ref == 'refs/heads/develop'
+  test:
+    name: Test
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
-          bun-version: 'latest'
-          
+          bun-version: ${{ env.BUN_VERSION }}
+
       - name: Install dependencies
         run: bun install
-          
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-          
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Run Lint & Type Check
+        run: |
+          bun run lint
+          bun run type-check
+
+      - name: Run Tests
+        run: bun test
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          
-      - name: Build Project Artifacts
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          
-      - name: Deploy Project Artifacts to Vercel
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          CI: true
 
   deploy-production:
-    needs: build-and-test
+    name: Deploy to Production
     if: github.ref == 'refs/heads/develop'
+    needs: test
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          
+          node-version: ${{ env.NODE_VERSION }}
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
-          bun-version: 'latest'
-          
-      - name: Install dependencies
-        run: bun install
-          
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-          
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          
-      - name: Build Project Artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          
-      - name: Deploy Project Artifacts to Vercel
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install Dependencies
+        run: |
+          bun install
+          npm install -g vercel@latest
+
+      - name: Deploy to Vercel (Production)
+        run: |
+          vercel pull --yes --environment=production --token=${{ env.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ env.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod --token=${{ env.VERCEL_TOKEN }}
