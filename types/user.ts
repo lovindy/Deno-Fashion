@@ -14,3 +14,5 @@ export interface ClerkUserData {
   gender?: 'MALE' | 'FEMALE' | 'OTHER' | null;
   birthday?: string;
 }
+
+

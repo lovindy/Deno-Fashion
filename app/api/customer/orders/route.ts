@@ -2,19 +2,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth-utils';
-
-// Define interfaces for type safety
-interface OrderItem {
-  productId: string;
-  variantId: string;
-  quantity: number;
-  price: number;
-}
-
-interface CreateOrderRequest {
-  items: OrderItem[];
-  addressId: string;
-}
+import { OrderItem, CreateOrderRequest } from '@/types/order';
 
 export async function POST(req: NextRequest) {
   const userId = await requireAuth(req);
