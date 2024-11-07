@@ -5,9 +5,9 @@ name: Next.js CI/CD
 
 on:
   push:
-    branches: [ main, development ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, development ]
+    branches: [ main, develop ]
 
 env:
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
