@@ -81,7 +81,7 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     needs: test
     runs-on: ubuntu-latest
-    environment: production
+    environment: development
     steps:
       - uses: actions/checkout@v4
 
