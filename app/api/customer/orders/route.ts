@@ -1,4 +1,4 @@
-// app/api/customer/orders/route.ts
+// Fixed formatting and added proper types to remove 'any'
 import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth-utils';
@@ -11,13 +11,17 @@ interface OrderItem {
   price: number;
 }
 
+interface CreateOrderRequest {
+  items: OrderItem[];
+  addressId: string;
+}
+
 export async function POST(req: NextRequest) {
   const userId = await requireAuth(req);
   if (userId instanceof NextResponse) return userId;
 
   try {
-    const { items, addressId } = await req.json();
-    // Removed unused paymentDetails from destructuring
+    const { items, addressId } = (await req.json()) as CreateOrderRequest;
 
     const order = await prisma.$transaction(async (prisma) => {
       const order = await prisma.order.create({
@@ -38,13 +42,12 @@ export async function POST(req: NextRequest) {
             (acc: number, item: OrderItem) => acc + item.price * item.quantity,
             0
           ),
-          tax: 0, // Calculate tax
-          shipping: 0, // Calculate shipping
-          total: 0, // Calculate total
+          tax: 0,
+          shipping: 0,
+          total: 0,
         },
       });
 
-      // Clear the user's cart after successful order creation
       await prisma.cartItem.deleteMany({
         where: { userId },
       });
@@ -53,11 +56,11 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(order);
-  } catch (err) {
+  } catch (error) {
     return NextResponse.json(
       {
         error: 'Failed to create order',
-        details: err instanceof Error ? err.message : 'Unknown error',
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

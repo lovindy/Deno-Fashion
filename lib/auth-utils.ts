@@ -1,27 +1,13 @@
-// lib/auth-utils.ts
 import { prisma } from './prisma';
 import { getAuth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import type { User } from '@prisma/client';
 import type { NextRequest } from 'next/server';
-import { Gender } from '@/types/gender';
+import { ClerkUserData } from '@/types/user';
 
 // Types
 export type AuthResult = string | NextResponse;
 export type AdminResult = { userId: string; user: User } | NextResponse;
-
-// Define interface for Clerk user data
-interface ClerkUserData {
-  email_addresses: Array<{
-    email_address: string;
-    verification?: {
-      status: 'verified' | 'unverified';
-    };
-  }>;
-  first_name: string | null;
-  last_name: string | null;
-  image_url: string | null;
-}
 
 // Super admin email - store this in environment variables
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL;
@@ -57,36 +43,38 @@ export async function requireSuperAdmin(
 }
 
 // Sync Clerk user with our database
-export async function syncUserWithDatabase(userId: string, userData: any) {
+export async function syncUserWithDatabase(
+  userId: string,
+  userData: ClerkUserData
+) {
   console.log('Syncing user data:', userData);
 
   try {
     const user = await prisma.user.upsert({
       where: { id: userId },
       update: {
-        email: userData.email_addresses?.[0]?.email_address || null,
+        email: userData.email_addresses?.[0]?.email_address || '',
         firstName: userData.first_name || '',
         lastName: userData.last_name || '',
         imageUrl: userData.image_url || null,
         isEmailVerified:
           userData.email_addresses?.[0]?.verification?.status === 'verified',
-        gender: (userData.gender?.toUpperCase() as Gender) || null,
+        gender: userData.gender || null,
         dateOfBirth: userData.birthday ? new Date(userData.birthday) : null,
       },
       create: {
         id: userId,
-        email: userData.email_addresses?.[0]?.email_address || null,
+        email: userData.email_addresses?.[0]?.email_address || '',
         firstName: userData.first_name || '',
         lastName: userData.last_name || '',
         imageUrl: userData.image_url || null,
         isEmailVerified:
           userData.email_addresses?.[0]?.verification?.status === 'verified',
         role:
-          userData.email_addresses?.[0]?.email_address ===
-          process.env.SUPER_ADMIN_EMAIL
+          userData.email_addresses?.[0]?.email_address === SUPER_ADMIN_EMAIL
             ? 'ADMIN'
             : 'CUSTOMER',
-        gender: (userData.gender?.toUpperCase() as Gender) || null,
+        gender: userData.gender || null,
         dateOfBirth: userData.birthday ? new Date(userData.birthday) : null,
       },
     });
